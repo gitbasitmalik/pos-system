@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, ShoppingCart, Package, Users, BarChart3, Settings, LogOut, Store } from "lucide-react"
+import { LayoutDashboard, ShoppingCart, Package, Users, BarChart3, LogOut, Store } from "lucide-react"
 import Button from "../ui/Button"
 
 const navigation = [
@@ -7,9 +7,8 @@ const navigation = [
   { name: "Sales", href: "/sales", icon: ShoppingCart },
   { name: "Products", href: "/products", icon: Package },
   { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "Customers", href: "/customers", icon: Users },
   { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Settings", href: "/settings", icon: Settings },
+
 ]
 
 const Sidebar = () => {

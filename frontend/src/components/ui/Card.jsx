@@ -31,3 +31,5 @@ export const CardContent = ({ children, className = "", ...props }) => {
     </div>
   )
 }
+
+export default Card;

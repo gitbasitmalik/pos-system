@@ -10,9 +10,8 @@ import DashboardPage from "./pages/DashboardPage"
 import SalesPage from "./pages/SalesPage"
 import ProductsPage from "./pages/ProductsPage"
 import InventoryPage from "./pages/InventoryPage"
-import CustomersPage from "./pages/CustomersPage"
 import ReportsPage from "./pages/ReportsPage"
-import SettingsPage from "./pages/SettingsPage"
+
 
 function App() {
   return (
@@ -30,9 +29,7 @@ function App() {
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
-        <Route path="/customers" element={<CustomersPage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/settings" element={<SettingsPage />} /> 
       </Routes>
     </Router>
   )

@@ -1,5 +1,3 @@
-
-
 import Sidebar from "../components/layout/Sidebar"
 import Header from "../components/layout/Header"
 import { Card, CardContent } from "@/components/ui/card"
@@ -7,86 +5,17 @@ import  Button  from "@/components/ui/button"
 import  Input  from "@/components/ui/input"
 import  Badge  from "@/components/ui/badge"
 import { Search, Plus, Edit, Trash2 } from "lucide-react"
-import  {useState}  from "react"
+import  {useState, useEffect}  from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/Dialog";
+import api from "../api/axios"
 
 export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
-
-  const products = [
-    {
-      id: 1,
-      name: "Premium Coffee",
-      price: 4.99,
-      category: "Beverages",
-      stock: 50,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 2,
-      name: "Club Sandwich",
-      price: 8.99,
-      category: "Food",
-      stock: 25,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 3,
-      name: "Chocolate Pastry",
-      price: 3.49,
-      category: "Food",
-      stock: 30,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 4,
-      name: "Green Tea",
-      price: 3.99,
-      category: "Beverages",
-      stock: 40,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 5,
-      name: "Caesar Salad",
-      price: 12.99,
-      category: "Food",
-      stock: 15,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 6,
-      name: "Fresh Orange Juice",
-      price: 5.99,
-      category: "Beverages",
-      stock: 0,
-      status: "Out of Stock",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 7,
-      name: "Blueberry Muffin",
-      price: 2.99,
-      category: "Food",
-      stock: 20,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-    {
-      id: 8,
-      name: "Iced Latte",
-      price: 5.49,
-      category: "Beverages",
-      stock: 35,
-      status: "Active",
-      image: "/placeholder.svg?height=60&width=60",
-    },
-  ]
+  const [products, setProducts] = useState([])
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: '', price: '', category: '', stock: '', status: 'Active', image: '' });
+  const [adding, setAdding] = useState(false);
 
   const categories = ["All", "Beverages", "Food"]
 
@@ -95,6 +24,63 @@ export default function ProductsPage() {
     const matchesCategory = selectedCategory === "All" || product.category === selectedCategory
     return matchesSearch && matchesCategory
   })
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    setAdding(true);
+    try {
+      const payload = {
+        name: newProduct.name,
+        price: parseFloat(newProduct.price),
+        category: newProduct.category,
+        stock: parseInt(newProduct.stock),
+        unitCost: parseFloat(newProduct.unitCost),
+        image: newProduct.image,
+        status: newProduct.status,
+      };
+      await api.post("/products", payload);
+      // Refetch products from backend
+      const res = await api.get("/products");
+      setProducts(res.data.map(p => ({
+        ...p,
+        id: p._id || p.id,
+        stock: p.stock ?? p.currentStock ?? 0,
+        price: p.price ?? p.sellPrice ?? 0,
+        status: p.status ?? "Active",
+        image: p.image || ""
+      })));
+      setShowAddDialog(false);
+      setNewProduct({ name: '', price: '', category: '', stock: '', status: 'Active', image: '' });
+    } catch (err) {
+      // Optionally handle error
+      console.error("Failed to add product", err);
+    }
+    setAdding(false);
+  };
+
+  const handleDelete = (productId) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+  }
+
+  // Fetch products from backend
+  useEffect(() => {
+    api.get("/products")
+      .then(res => {
+        // Map backend _id to id for frontend compatibility
+        setProducts(res.data.map(p => ({
+          ...p,
+          id: p._id || p.id,
+          stock: p.stock ?? p.currentStock ?? 0,
+          price: p.price ?? p.sellPrice ?? 0,
+          status: p.status ?? "Active",
+          image: p.image || ""
+        })))
+      })
+      .catch(err => {
+        // Optionally handle error
+        console.error("Failed to fetch products", err)
+      })
+  }, [])
 
   return (
     <div className="flex h-screen bg-[#f9fafb]">
@@ -108,7 +94,7 @@ export default function ProductsPage() {
                 <h1 className="text-2xl font-bold text-[#101828]">Products</h1>
                 <p className="text-[#475467]">Manage your product inventory</p>
               </div>
-              <Button className="bg-[#f6b100] hover:bg-[#ffbb11] text-white">
+              <Button className="bg-[#f6b100] hover:bg-[#ffbb11] text-white" onClick={() => setShowAddDialog(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Product
               </Button>
@@ -182,6 +168,7 @@ export default function ProductsPage() {
                         size="sm"
                         variant="outline"
                         className="border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
+                        onClick={() => handleDelete(product.id)}
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
@@ -201,6 +188,49 @@ export default function ProductsPage() {
           </div>
         </main>
       </div>
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Product</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddProduct} className="space-y-4">
+            <Input
+              placeholder="Product Name"
+              value={newProduct.name}
+              onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Price"
+              type="number"
+              value={newProduct.price}
+              onChange={e => setNewProduct({ ...newProduct, price: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Category"
+              value={newProduct.category}
+              onChange={e => setNewProduct({ ...newProduct, category: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Stock"
+              type="number"
+              value={newProduct.stock}
+              onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Image URL (optional)"
+              value={newProduct.image}
+              onChange={e => setNewProduct({ ...newProduct, image: e.target.value })}
+            />
+            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white" disabled={adding}>
+              {adding ? 'Adding...' : 'Add Product'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

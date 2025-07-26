@@ -1,52 +1,55 @@
-
-
+import { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom"
 import Sidebar from "../components/layout/Sidebar"
 import Header from "../components/layout/Header"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button"
 import { DollarSign, ShoppingCart, Package, Users, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import api from "../api/axios"
+
+
+const iconMap = {
+  DollarSign,
+  ShoppingCart,
+  Package,
+  Users,
+  TrendingUp,
+  ArrowUpRight,
+  ArrowDownRight,
+};
 
 const DashboardPage = () => {
   const navigate = useNavigate()
+  const [products, setProducts] = useState([])
+  const [sales, setSales] = useState([])
+  const [stats, setStats] = useState([])
+  const [recentSales, setRecentSales] = useState([])
 
-  const stats = [
-    {
-      title: "Today's Sales",
-      value: "$2,847.50",
-      change: "+12.5%",
-      trend: "up",
-      icon: DollarSign,
-    },
-    {
-      title: "Orders",
-      value: "156",
-      change: "+8.2%",
-      trend: "up",
-      icon: ShoppingCart,
-    },
-    {
-      title: "Products",
-      value: "1,247",
-      change: "-2.1%",
-      trend: "down",
-      icon: Package,
-    },
-    {
-      title: "Customers",
-      value: "892",
-      change: "+15.3%",
-      trend: "up",
-      icon: Users,
-    },
-  ]
-
-  const recentSales = [
-    { id: "#001", customer: "John Doe", amount: "$45.99", time: "2 min ago" },
-    { id: "#002", customer: "Jane Smith", amount: "$78.50", time: "5 min ago" },
-    { id: "#003", customer: "Mike Johnson", amount: "$123.75", time: "8 min ago" },
-    { id: "#004", customer: "Sarah Wilson", amount: "$67.25", time: "12 min ago" },
-  ]
+  useEffect(() => {
+    async function fetchData() {
+      const [productsRes, salesRes] = await Promise.all([
+        api.get('/products'),
+        api.get('/sales'),
+      ])
+      setProducts(productsRes.data)
+      setSales(salesRes.data)
+      // Calculate stats
+      const totalSales = salesRes.data.reduce((sum, s) => sum + (s.total || 0), 0)
+      const totalOrders = salesRes.data.length
+      const totalProducts = productsRes.data.length
+      // Optionally, count unique customers if available
+      const uniqueCustomers = new Set(salesRes.data.map(s => s.customerId || s.customer)).size
+      setStats([
+        { title: "Total Sales", value: `$${totalSales.toFixed(2)}`, change: '', trend: 'up', icon: 'DollarSign' },
+        { title: "Orders", value: totalOrders, change: '', trend: 'up', icon: 'ShoppingCart' },
+        { title: "Products", value: totalProducts, change: '', trend: 'up', icon: 'Package' },
+        { title: "Customers", value: uniqueCustomers, change: '', trend: 'up', icon: 'Users' },
+      ])
+      // Recent sales (last 5)
+      setRecentSales(salesRes.data.slice(-5).reverse())
+    }
+    fetchData()
+  }, [])
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -62,7 +65,7 @@ const DashboardPage = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {stats.map((stat) => {
-                const Icon = stat.icon
+                const Icon = iconMap[stat.icon] || DollarSign
                 return (
                   <Card key={stat.title} className="bg-white border-gray-200">
                     <CardContent className="p-6">
@@ -137,14 +140,6 @@ const DashboardPage = () => {
                     >
                       <Package className="w-6 h-6 mb-2" />
                       Add Product
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-20 border-gray-300 flex flex-col bg-transparent"
-                      onClick={() => navigate("/customers")}
-                    >
-                      <Users className="w-6 h-6 mb-2" />
-                      Add Customer
                     </Button>
                     <Button
                       variant="outline"

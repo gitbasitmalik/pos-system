@@ -1,6 +1,4 @@
-
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Sidebar from "../components/layout/Sidebar"
 import Header from "../components/layout/Header"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
@@ -9,16 +7,14 @@ import Input from "../components/ui/Input"
 import Badge from "../components/ui/Badge"
 import ReceiptPrinter from "../components/receipt/ReceiptPrinter"
 import { Search, Plus, Minus, Trash2, CreditCard, DollarSign } from "lucide-react"
+import api from "../api/axios"
 
 const SalesPage = () => {
-  const [cart, setCart] = useState([
-    { id: 1, name: "Coffee", price: 4.99, quantity: 2, image: "/placeholder.svg?height=50&width=50" },
-    { id: 2, name: "Sandwich", price: 8.99, quantity: 1, image: "/placeholder.svg?height=50&width=50" },
-  ])
-
   const [searchTerm, setSearchTerm] = useState("")
   const [showReceipt, setShowReceipt] = useState(false)
   const [lastTransaction, setLastTransaction] = useState(null)
+  const [products, setProducts] = useState([])
+  const [cart, setCart] = useState([])
 
   const businessInfo = {
     name: "Nustly Coffee Shop",
@@ -27,38 +23,36 @@ const SalesPage = () => {
     email: "info@nustly.com",
   }
 
-  const products = [
-    {
-      id: 1,
-      name: "Coffee",
-      price: 4.99,
-      category: "Beverages",
-      stock: 50,
-      image: "/placeholder.svg?height=80&width=80",
-    },
-    { id: 2, name: "Sandwich", price: 8.99, category: "Food", stock: 25, image: "/placeholder.svg?height=80&width=80" },
-    { id: 3, name: "Pastry", price: 3.49, category: "Food", stock: 30, image: "/placeholder.svg?height=80&width=80" },
-    { id: 4, name: "Tea", price: 3.99, category: "Beverages", stock: 40, image: "/placeholder.svg?height=80&width=80" },
-    { id: 5, name: "Salad", price: 12.99, category: "Food", stock: 15, image: "/placeholder.svg?height=80&width=80" },
-    {
-      id: 6,
-      name: "Juice",
-      price: 5.99,
-      category: "Beverages",
-      stock: 20,
-      image: "/placeholder.svg?height=80&width=80",
-    },
-  ]
+  useEffect(() => {
+    api.get("/products").then(res => {
+      setProducts(res.data.map(p => ({
+        ...p,
+        id: p._id || p.id,
+        name: p.name,
+        price: p.price ?? p.sellPrice ?? 0,
+        category: p.category || '',
+        stock: p.stock ?? p.currentStock ?? 0,
+        image: p.image || '',
+      })))
+    })
+  }, [])
 
   const filteredProducts = products.filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
 
-  const addToCart = (product) => {
-    const existingItem = cart.find((item) => item.id === product.id)
-    if (existingItem) {
-      setCart(cart.map((item) => (item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)))
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }])
-    }
+  const addToCart = async (product) => {
+    // Decrease stock in backend
+    if (product.stock <= 0) return
+    await api.put(`/products/${product.id}`, { stock: product.stock - 1 })
+    setProducts(products => products.map(p => p.id === product.id ? { ...p, stock: p.stock - 1 } : p))
+    // Add to cart or increase quantity
+    setCart(cart => {
+      const existing = cart.find(item => item.id === product.id)
+      if (existing) {
+        return cart.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
+      } else {
+        return [...cart, { ...product, quantity: 1 }]
+      }
+    })
   }
 
   const updateQuantity = (id, change) => {
@@ -83,9 +77,31 @@ const SalesPage = () => {
   const tax = subtotal * 0.08
   const total = subtotal + tax
 
-  const handlePayment = (paymentMethod) => {
+  const handlePayment = async (paymentMethod) => {
+    if (cart.length === 0) return;
+    const now = new Date();
+    const salePayload = {
+      items: cart.map(item => ({
+        productId: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        total: item.price * item.quantity,
+      })),
+      subtotal,
+      tax,
+      total,
+      paymentMethod,
+      cashier: "John Doe",
+      businessInfo,
+      date: now.toLocaleDateString(),
+      time: now.toLocaleTimeString(),
+      receiptNumber: `R${now.getTime()}`,
+    };
+    const saleRes = await api.post('/sales', salePayload);
+    // Set receipt data for modal
     const receiptData = {
-      receiptNumber: `R${Date.now().toString().slice(-6)}`,
+      receiptNumber: saleRes.data._id || `R${Date.now().toString().slice(-6)}`,
       date: new Date().toLocaleDateString(),
       time: new Date().toLocaleTimeString(),
       items: cart.map((item) => ({
@@ -100,11 +116,21 @@ const SalesPage = () => {
       paymentMethod,
       cashier: "John Doe",
       businessInfo,
-    }
-
-    setLastTransaction(receiptData)
-    setShowReceipt(true)
-    setCart([]) // Clear cart after payment
+    };
+    setLastTransaction(receiptData);
+    setShowReceipt(true);
+    setCart([]);
+    // Refetch products to update inventory
+    const res = await api.get('/products');
+    setProducts(res.data.map(p => ({
+      ...p,
+      id: p._id || p.id,
+      name: p.name,
+      price: p.price ?? p.sellPrice ?? 0,
+      category: p.category || '',
+      stock: p.stock ?? p.currentStock ?? 0,
+      image: p.image || '',
+    })));
   }
 
   return (

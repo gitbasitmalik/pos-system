@@ -1,5 +1,3 @@
-
-
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import Button from "../components/ui/Button"
@@ -19,7 +17,8 @@ const RegisterPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    navigate("/verification-code")
+    // Accept any registration for demo
+    navigate('/verification-code')
   }
 
   const handleChange = (e) => {

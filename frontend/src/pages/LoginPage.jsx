@@ -1,5 +1,3 @@
-
-
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import Button from "../components/ui/Button"
@@ -13,8 +11,9 @@ const LoginPage = () => {
   const navigate = useNavigate()
 
   const handleLogin = (e) => {
-    e.preventDefault()
-    navigate("/dashboard")
+    e.preventDefault();
+    // Accept any email/password for demo
+    navigate('/dashboard');
   }
 
   return (

@@ -1,6 +1,4 @@
-
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Sidebar from "../components/layout/Sidebar"
 import Header from "../components/layout/Header"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
@@ -10,71 +8,36 @@ import Badge from "../components/ui/Badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/Dialog"
 import Label from "../components/ui/Label"
 import { Search, Plus, Minus, AlertTriangle, Package, TrendingDown, TrendingUp, Edit } from "lucide-react"
+import api from "../api/axios"
 
 const InventoryPage = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState(["All", "Beverages", "Food"])
 
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      name: "Premium Coffee",
-      sku: "COF001",
-      category: "Beverages",
-      currentStock: 45,
-      reorderPoint: 20,
-      maxStock: 100,
-      unitCost: 2.5,
-      sellPrice: 4.99,
-      supplier: "Coffee Beans Co.",
-      lastRestocked: "2024-01-05",
-      status: "In Stock",
-    },
-    {
-      id: 2,
-      name: "Club Sandwich",
-      sku: "FOD001",
-      category: "Food",
-      currentStock: 8,
-      reorderPoint: 15,
-      maxStock: 50,
-      unitCost: 4.5,
-      sellPrice: 8.99,
-      supplier: "Fresh Foods Ltd.",
-      lastRestocked: "2024-01-06",
-      status: "Low Stock",
-    },
-    {
-      id: 3,
-      name: "Chocolate Pastry",
-      sku: "FOD002",
-      category: "Food",
-      currentStock: 0,
-      reorderPoint: 10,
-      maxStock: 30,
-      unitCost: 1.75,
-      sellPrice: 3.49,
-      supplier: "Bakery Supply",
-      lastRestocked: "2024-01-03",
-      status: "Out of Stock",
-    },
-    {
-      id: 4,
-      name: "Green Tea",
-      sku: "BEV002",
-      category: "Beverages",
-      currentStock: 35,
-      reorderPoint: 15,
-      maxStock: 60,
-      unitCost: 2.0,
-      sellPrice: 3.99,
-      supplier: "Tea Masters",
-      lastRestocked: "2024-01-04",
-      status: "In Stock",
-    },
-  ])
-
-  const categories = ["All", "Beverages", "Food"]
+  useEffect(() => {
+    api.get("/products")
+      .then(res => {
+        setProducts(
+          res.data.map(p => ({
+            ...p,
+            id: p._id || p.id,
+            name: p.name,
+            sku: p.sku || '',
+            category: p.category || '',
+            currentStock: p.currentStock ?? p.stock ?? 0,
+            reorderPoint: p.reorderPoint ?? 5,
+            status: p.status ?? 'In Stock',
+            price: p.price ?? 0,
+          }))
+        )
+      })
+      .catch(err => {
+        // Optionally handle error
+        console.error("Failed to fetch products", err)
+      })
+  }, [])
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
@@ -87,20 +50,30 @@ const InventoryPage = () => {
   const lowStockProducts = products.filter((p) => p.currentStock <= p.reorderPoint && p.currentStock > 0)
   const outOfStockProducts = products.filter((p) => p.currentStock === 0)
 
-  const handleStockAdjustment = (productId, adjustment, reason) => {
-    setProducts(
-      products.map((product) => {
-        if (product.id === productId) {
-          const newStock = Math.max(0, product.currentStock + adjustment)
-          let status = "In Stock"
-          if (newStock === 0) status = "Out of Stock"
-          else if (newStock <= product.reorderPoint) status = "Low Stock"
-
-          return { ...product, currentStock: newStock, status }
-        }
-        return product
-      }),
-    )
+  const handleStockAdjustment = async (productId, adjustment, reason) => {
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+    const newStock = Math.max(0, product.currentStock + adjustment)
+    try {
+      await api.put(`/products/${productId}`, { stock: newStock }) // <-- use 'stock' field
+      // Refetch products
+      const res = await api.get('/products')
+      setProducts(res.data.map(p => ({
+        ...p,
+        id: p._id || p.id,
+        name: p.name,
+        sku: p.sku || '',
+        category: p.category || '',
+        currentStock: p.currentStock ?? p.stock ?? 0,
+        reorderPoint: p.reorderPoint ?? 5,
+        status: p.status ?? 'In Stock',
+        price: p.price ?? 0,
+      })))
+      // Optionally show a success message or close dialog
+    } catch (err) {
+      // Optionally show error message
+      console.error("Failed to adjust stock", err)
+    }
   }
 
   const getStatusColor = (status) => {
@@ -112,7 +85,7 @@ const InventoryPage = () => {
       case "Out of Stock":
         return "bg-red-50 text-red-500"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-blue-100 text-gray-800"
     }
   }
 
@@ -128,10 +101,6 @@ const InventoryPage = () => {
                 <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
                 <p className="text-gray-500">Track and manage your product inventory</p>
               </div>
-              <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Product
-              </Button>
             </div>
 
             {/* Inventory Stats */}
@@ -178,7 +147,7 @@ const InventoryPage = () => {
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Total Value</p>
                       <p className="text-2xl font-bold text-green-500">
-                        ${products.reduce((sum, p) => sum + p.currentStock * p.unitCost, 0).toFixed(2)}
+                        ${products.reduce((sum, p) => sum + p.currentStock * p.price, 0).toFixed(2)}
                       </p>
                     </div>
                     <TrendingUp className="w-8 h-8 text-green-500" />
@@ -256,7 +225,7 @@ const InventoryPage = () => {
                         <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">SKU</th>
                         <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Stock</th>
                         <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Status</th>
-                        <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Unit Cost</th>
+                        <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Unit Price</th>
                         <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Value</th>
                         <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Actions</th>
                       </tr>
@@ -280,9 +249,9 @@ const InventoryPage = () => {
                           <td className="py-4 px-2">
                             <Badge className={getStatusColor(product.status)}>{product.status}</Badge>
                           </td>
-                          <td className="py-4 px-2 text-sm text-gray-500">${product.unitCost}</td>
+                          <td className="py-4 px-2 text-sm text-gray-500">${product.price}</td>
                           <td className="py-4 px-2 font-medium text-gray-900">
-                            ${(product.currentStock * product.unitCost).toFixed(2)}
+                            ${(product.currentStock * product.price).toFixed(2)}
                           </td>
                           <td className="py-4 px-2">
                             <Dialog>
